@@ -37,6 +37,15 @@ export const formLogicFn = (t) => {
             shortenedLinks: null,
             shortening: false,
             customShortCode: '',
+            customName: '',
+            showQrModal: false,
+            qrClientKey: '',
+            qrClientLabel: '',
+            qrDisplayName: '',
+            qrUrl: '',
+            qrImageCopied: false,
+            qrCanvas: null,
+            qrTooLong: false,
             parsingUrl: false,
             parseDebounceTimer: null,
             // These will be populated from window.APP_TRANSLATIONS
@@ -72,6 +81,7 @@ export const formLogicFn = (t) => {
                 this.configEditor = localStorage.getItem('configEditor') || '';
                 this.configType = localStorage.getItem('configType') || 'singbox';
                 this.customShortCode = localStorage.getItem('customShortCode') || '';
+                this.customName = localStorage.getItem('customName') || '';
                 const initialUrlParams = new URLSearchParams(window.location.search);
                 this.currentConfigId = initialUrlParams.get('configId') || '';
 
@@ -109,6 +119,7 @@ export const formLogicFn = (t) => {
                     this.resetConfigValidation();
                 });
                 this.$watch('customShortCode', val => localStorage.setItem('customShortCode', val));
+                this.$watch('customName', val => localStorage.setItem('customName', val));
                 this.$watch('accordionSections', val => localStorage.setItem('accordionSections', JSON.stringify(val)), { deep: true });
             },
 
@@ -268,11 +279,13 @@ export const formLogicFn = (t) => {
             clearAll() {
                 if (confirm(window.APP_TRANSLATIONS.confirmClearAll)) {
                     this.input = '';
+                    this.customName = '';
                     this.generatedLinks = null;
                     this.shortenedLinks = null;
                     this.customShortCode = '';
                     // Also clear from localStorage
                     localStorage.removeItem('customShortCode');
+                    localStorage.removeItem('customName');
                 }
             },
 
@@ -301,6 +314,10 @@ export const formLogicFn = (t) => {
                     params.append('ua', this.customUA);
                     params.append('selectedRules', JSON.stringify(this.selectedRules));
                     params.append('customRules', JSON.stringify(customRules));
+
+                    if (this.customName && this.customName.trim()) {
+                        params.append('name', this.customName.trim());
+                    }
 
                     if (this.groupByCountry) params.append('group_by_country', 'true');
                     if (!this.includeAutoSelect) params.append('include_auto_select', 'false');
@@ -569,11 +586,179 @@ export const formLogicFn = (t) => {
                     this.updateConfigIdInUrl(configId);
                 }
 
+                const name = params.get('name');
+                if (name) {
+                    this.customName = name;
+                }
+
                 // Expand advanced options if any advanced settings are present
                 if (selectedRules || customRules || this.groupByCountry || this.enableClashUI ||
                     externalController || externalUiDownloadUrl || ua || configId) {
                     this.showAdvanced = true;
                 }
+            },
+
+            openQrModal(clientKey, clientLabel) {
+                const links = this.shortenedLinks || this.generatedLinks;
+                if (!links || !links[clientKey]) return;
+
+                const url = links[clientKey];
+                const baseName = (this.customName || '').trim();
+                const displayName = baseName ? `${baseName} (${clientLabel})` : clientLabel;
+
+                this.qrClientKey = clientKey;
+                this.qrClientLabel = clientLabel;
+                this.qrDisplayName = displayName;
+                this.qrUrl = url;
+                this.qrImageCopied = false;
+                this.qrTooLong = false;
+                this.showQrModal = true;
+
+                this.$nextTick(() => {
+                    this.renderQrCode();
+                });
+            },
+
+            closeQrModal() {
+                this.showQrModal = false;
+                this.qrImageCopied = false;
+            },
+
+            renderQrCode() {
+                const container = document.getElementById('qrCanvasContainer');
+                if (!container) return;
+                container.innerHTML = '';
+
+                if (typeof window.qrcode !== 'function') {
+                    console.error('qrcode library not found');
+                    return;
+                }
+
+                try {
+                    // Level 'L' allows maximum data capacity for long URLs
+                    const qr = window.qrcode(0, 'L');
+                    qr.addData(this.qrUrl);
+                    qr.make();
+
+                    const moduleCount = qr.getModuleCount();
+                    const qrPixelSize = 220;
+                    const padding = 20;
+                    const headerHeight = 52;
+                    const footerHeight = 32;
+
+                    const width = qrPixelSize + padding * 2;
+                    const height = qrPixelSize + padding * 2 + headerHeight + footerHeight;
+
+                    const scale = 2; // High-DPI canvas
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width * scale;
+                    canvas.height = height * scale;
+                    canvas.style.width = width + 'px';
+                    canvas.style.height = height + 'px';
+                    canvas.style.maxWidth = '100%';
+                    canvas.style.display = 'block';
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.scale(scale, scale);
+
+                    // Background: Pure clean white card
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, width, height);
+
+                    // Top Link Name (二维码上方显示链接名字)
+                    ctx.fillStyle = '#111827';
+                    ctx.font = 'bold 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+
+                    let text = this.qrDisplayName || this.qrClientLabel;
+                    const maxTextWidth = width - 24;
+                    if (ctx.measureText(text).width > maxTextWidth) {
+                        while (text.length > 3 && ctx.measureText(text + '...').width > maxTextWidth) {
+                            text = text.slice(0, -1);
+                        }
+                        text += '...';
+                    }
+                    ctx.fillText(text, width / 2, padding + 14);
+
+                    // Divider
+                    ctx.strokeStyle = '#e5e7eb';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(padding, padding + 32);
+                    ctx.lineTo(width - padding, padding + 32);
+                    ctx.stroke();
+
+                    // Render QR Code Modules
+                    const qrStartY = padding + headerHeight;
+                    const cellSize = qrPixelSize / moduleCount;
+                    ctx.fillStyle = '#000000';
+                    for (let r = 0; r < moduleCount; r++) {
+                        for (let c = 0; c < moduleCount; c++) {
+                            if (qr.isDark(r, c)) {
+                                ctx.fillRect(
+                                    padding + c * cellSize,
+                                    qrStartY + r * cellSize,
+                                    cellSize + 0.4,
+                                    cellSize + 0.4
+                                );
+                            }
+                        }
+                    }
+
+                    // Bottom Footer: scan to import
+                    ctx.fillStyle = '#6b7280';
+                    ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif';
+                    ctx.textAlign = 'center';
+                    const scanHint = (window.APP_TRANSLATIONS && window.APP_TRANSLATIONS.scanToImport) || '扫码导入配置';
+                    ctx.fillText(scanHint, width / 2, height - 14);
+
+                    this.qrCanvas = canvas;
+                    container.appendChild(canvas);
+                    this.qrTooLong = false;
+                } catch (err) {
+                    console.error('Failed to generate QR code:', err);
+                    this.qrTooLong = true;
+                }
+            },
+
+            async copyQrImage() {
+                if (!this.qrCanvas || this.qrTooLong) return;
+                try {
+                    this.qrCanvas.toBlob(async (blob) => {
+                        if (!blob) {
+                            this.downloadQrImage();
+                            return;
+                        }
+                        try {
+                            if (navigator.clipboard && window.ClipboardItem && navigator.clipboard.write) {
+                                await navigator.clipboard.write([
+                                    new ClipboardItem({ 'image/png': blob })
+                                ]);
+                                this.qrImageCopied = true;
+                                setTimeout(() => { this.qrImageCopied = false; }, 2500);
+                                return;
+                            }
+                        } catch (clipErr) {
+                            console.warn('ClipboardItem write failed, fallback to download:', clipErr);
+                        }
+                        // Fallback: download image
+                        this.downloadQrImage();
+                        this.qrImageCopied = true;
+                        setTimeout(() => { this.qrImageCopied = false; }, 2500);
+                    }, 'image/png');
+                } catch (e) {
+                    console.error('Failed to copy QR image:', e);
+                    this.downloadQrImage();
+                }
+            },
+
+            downloadQrImage() {
+                if (!this.qrCanvas || this.qrTooLong) return;
+                const link = document.createElement('a');
+                link.download = (this.qrDisplayName || 'subscription-qrcode').replace(/[\\/:*?"<>|]/g, '_') + '.png';
+                link.href = this.qrCanvas.toDataURL('image/png');
+                link.click();
             }
         }
     }

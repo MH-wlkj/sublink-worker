@@ -34,7 +34,17 @@ export const Form = (props) => {
     customShortCode: t('customShortCode'),
     optional: t('optional'),
     customShortCodePlaceholder: t('customShortCodePlaceholder'),
-    showFullLinks: t('showFullLinks')
+    showFullLinks: t('showFullLinks'),
+    customLinkName: t('customLinkName'),
+    customLinkNamePlaceholder: t('customLinkNamePlaceholder'),
+    customLinkNameTip: t('customLinkNameTip'),
+    qrCode: t('qrCode'),
+    copyQrImage: t('copyQrImage'),
+    qrImageCopied: t('qrImageCopied'),
+    downloadQrImage: t('downloadQrImage'),
+    clickToCopyImage: t('clickToCopyImage'),
+    qrTooLongTip: t('qrTooLongTip'),
+    scanToImport: t('scanToImport')
   };
 
   const scriptContent = `
@@ -92,6 +102,34 @@ export const Form = (props) => {
             }
           ]}
         />
+      </div>
+
+      {/* Custom Link Name Section */}
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-all duration-300 hover:shadow-md">
+        <div class="space-y-2">
+          <div class="flex items-center justify-between mb-1">
+            <label for="customName" class="block text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <span class="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 flex items-center justify-center">
+                <i class="fas fa-signature text-sm"></i>
+              </span>
+              {t('customLinkName')}
+            </label>
+            <span class="text-xs text-gray-400">({t('optional')})</span>
+          </div>
+          <div class="relative">
+            <input
+              type="text"
+              id="customName"
+              name="customName"
+              x-model="customName"
+              placeholder={t('customLinkNamePlaceholder')}
+              class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 dark:bg-gray-900"
+            />
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400">
+            {t('customLinkNameTip')}
+          </p>
+        </div>
       </div>
 
       {/* Advanced Options Toggle */}
@@ -379,6 +417,14 @@ class="px-6 py-3.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 bo
               >
                 <i class="fas" x-bind:class={`copied === '${field.key}' ? 'fa-check' : 'fa-copy'`}></i>
               </button>
+              <button
+                type="button"
+                x-on:click={`openQrModal('${field.key}', '${t(field.labelKey)}')`}
+                title={t('qrCode')}
+                class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1.5 hover:bg-primary-100 dark:hover:bg-primary-900/30 hover:text-primary-600 dark:hover:text-primary-400"
+              >
+                <i class="fas fa-qrcode"></i>
+              </button>
             </div>
           </div>
         ))}
@@ -418,6 +464,105 @@ class="px-6 py-3.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 bo
             ></span>
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  {/* QR Code Modal */}
+  <div
+    x-cloak
+    x-show="showQrModal"
+    {...{
+      'x-transition:enter': 'transition ease-out duration-300',
+      'x-transition:enter-start': 'opacity-0',
+      'x-transition:enter-end': 'opacity-100',
+      'x-transition:leave': 'transition ease-in duration-200',
+      'x-transition:leave-start': 'opacity-100',
+      'x-transition:leave-end': 'opacity-0',
+      'x-on:click.self': 'closeQrModal()',
+      'x-on:keydown.escape.window': 'closeQrModal()'
+    }}
+    class="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+  >
+    <div
+      x-show="showQrModal"
+      {...{
+        'x-transition:enter': 'transition ease-out duration-300',
+        'x-transition:enter-start': 'opacity-0 scale-95 translate-y-4',
+        'x-transition:enter-end': 'opacity-100 scale-100 translate-y-0',
+        'x-transition:leave': 'transition ease-in duration-200',
+        'x-transition:leave-start': 'opacity-100 scale-100 translate-y-0',
+        'x-transition:leave-end': 'opacity-0 scale-95 translate-y-4'
+      }}
+      class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-w-sm w-full p-6 relative overflow-hidden"
+    >
+      {/* Close button */}
+      <button
+        type="button"
+        x-on:click="closeQrModal()"
+        class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+      >
+        <i class="fas fa-times text-lg"></i>
+      </button>
+
+      {/* Header with Title above QR */}
+      <div class="text-center mb-4 pr-6">
+        <span class="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 mb-2">
+          <i class="fas fa-tag mr-1 text-[10px]"></i>
+          <span x-text="qrClientLabel"></span>
+        </span>
+        <h3 class="text-lg font-bold text-gray-900 dark:text-white break-words" x-text="qrDisplayName"></h3>
+      </div>
+
+      {/* QR Code Canvas Card Area */}
+      <div class="flex flex-col items-center justify-center">
+        <div
+          x-show="!qrTooLong"
+          x-on:click="copyQrImage()"
+          class="cursor-pointer group relative p-2 bg-white rounded-xl shadow-md border border-gray-200 dark:border-gray-600 hover:shadow-xl transition-all duration-200 flex flex-col items-center"
+          title={t('clickToCopyImage')}
+        >
+          {/* Canvas mount element */}
+          <div id="qrCanvasContainer" class="flex justify-center items-center"></div>
+
+          {/* Hover overlay hint */}
+          <div class="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+            <span class="bg-white/95 text-gray-800 text-xs font-bold px-3 py-1.5 rounded-full shadow flex items-center gap-1.5">
+              <i class="fas fa-copy"></i>
+              {t('clickToCopyImage')}
+            </span>
+          </div>
+        </div>
+
+        {/* Error if URL too long */}
+        <div x-show="qrTooLong" class="p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-xl text-center text-sm text-amber-700 dark:text-amber-300">
+          <i class="fas fa-exclamation-triangle text-amber-500 text-xl mb-2"></i>
+          <p>{t('qrTooLongTip')}</p>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div class="mt-5 flex gap-2" x-show="!qrTooLong">
+        <button
+          type="button"
+          x-on:click="copyQrImage()"
+          class="flex-1 py-2.5 px-4 rounded-xl font-semibold text-white shadow-md transition-all duration-200 flex items-center justify-center gap-2 text-sm"
+          x-bind:class="qrImageCopied
+            ? 'bg-green-600 hover:bg-green-700 shadow-green-500/30'
+            : 'bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 shadow-primary-500/30'"
+        >
+          <i class="fas" x-bind:class="qrImageCopied ? 'fa-check' : 'fa-copy'"></i>
+          <span x-text="qrImageCopied ? (window.APP_TRANSLATIONS.qrImageCopied || '已复制图片！') : (window.APP_TRANSLATIONS.copyQrImage || '复制二维码图片 (带名字)')"></span>
+        </button>
+
+        <button
+          type="button"
+          x-on:click="downloadQrImage()"
+          title={t('downloadQrImage')}
+          class="px-3.5 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-xl transition-colors text-sm flex items-center justify-center"
+        >
+          <i class="fas fa-download"></i>
+        </button>
       </div>
     </div>
   </div>

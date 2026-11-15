@@ -114,6 +114,13 @@ export function createApp(bindings = {}) {
                 includeAutoSelect
             );
             await builder.build();
+            const customName = c.req.query('name');
+            if (customName) {
+                const filename = `${customName}.json`;
+                const encoded = encodeURIComponent(filename);
+                c.header('Content-Disposition', `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`);
+                c.header('profile-title', encodeURIComponent(customName));
+            }
             return c.json(builder.config);
         } catch (error) {
             return handleError(c, error, runtime.logger);
@@ -158,6 +165,13 @@ export function createApp(bindings = {}) {
                 includeAutoSelect
             );
             await builder.build();
+            const customName = c.req.query('name');
+            if (customName) {
+                const filename = `${customName}.yaml`;
+                const encoded = encodeURIComponent(filename);
+                c.header('Content-Disposition', `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`);
+                c.header('profile-title', encodeURIComponent(customName));
+            }
             return c.text(builder.formatConfig(), 200, {
                 'Content-Type': 'text/yaml; charset=utf-8'
             });
@@ -199,6 +213,14 @@ export function createApp(bindings = {}) {
             );
             builder.setSubscriptionUrl(c.req.url);
             await builder.build();
+
+            const customName = c.req.query('name');
+            if (customName) {
+                const filename = `${customName}.conf`;
+                const encoded = encodeURIComponent(filename);
+                c.header('Content-Disposition', `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`);
+                c.header('profile-title', encodeURIComponent(customName));
+            }
 
             c.header('subscription-userinfo', 'upload=0; download=0; total=10737418240; expire=2546249531');
             return c.text(builder.formatConfig());
@@ -283,6 +305,14 @@ export function createApp(bindings = {}) {
         const finalString = finalProxyList.join('\n');
         if (!finalString) {
             return c.text('Missing config parameter', 400);
+        }
+
+        const customName = c.req.query('name');
+        if (customName) {
+            const filename = `${customName}.txt`;
+            const encoded = encodeURIComponent(filename);
+            c.header('Content-Disposition', `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`);
+            c.header('profile-title', encodeURIComponent(customName));
         }
 
         return c.text(encodeBase64(finalString));
