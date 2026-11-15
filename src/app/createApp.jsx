@@ -11,6 +11,7 @@ import { ClashConfigBuilder } from '../builders/ClashConfigBuilder.js';
 import { SurgeConfigBuilder } from '../builders/SurgeConfigBuilder.js';
 import { createTranslator, resolveLanguage } from '../i18n/index.js';
 import { encodeBase64, tryDecodeSubscriptionLines } from '../utils.js';
+import { isRawSocksFormat, parseSocks, toSocks5Url } from '../parsers/protocols/socksParser.js';
 import { APP_NAME, APP_SUBTITLE } from '../constants.js';
 import { ShortLinkService } from '../services/shortLinkService.js';
 import { ConfigStorageService } from '../services/configStorageService.js';
@@ -281,6 +282,19 @@ export function createApp(bindings = {}) {
         const userAgent = c.req.query('ua') || getRequestHeader(c.req, 'User-Agent') || DEFAULT_USER_AGENT;
         const headers = { 'User-Agent': userAgent };
 
+        const normalizeProxyForXray = (item) => {
+            if (typeof item !== 'string') return item;
+            const t = item.trim();
+            if (!t) return null;
+            if (isRawSocksFormat(t)) {
+                const parsed = parseSocks(t);
+                if (parsed) {
+                    return toSocks5Url(parsed);
+                }
+            }
+            return t;
+        };
+
         for (const proxy of proxylist) {
             const trimmedProxy = proxy.trim();
             if (!trimmedProxy) continue;
@@ -291,14 +305,14 @@ export function createApp(bindings = {}) {
                     const text = await response.text();
                     let processed = tryDecodeSubscriptionLines(text, { decodeUriComponent: true });
                     if (!Array.isArray(processed)) processed = [processed];
-                    finalProxyList.push(...processed.filter(item => typeof item === 'string' && item.trim() !== ''));
+                    finalProxyList.push(...processed.map(normalizeProxyForXray).filter(item => typeof item === 'string' && item.trim() !== ''));
                 } catch (e) {
                     runtime.logger.warn('Failed to fetch the proxy', e);
                 }
             } else {
                 let processed = tryDecodeSubscriptionLines(trimmedProxy);
                 if (!Array.isArray(processed)) processed = [processed];
-                finalProxyList.push(...processed.filter(item => typeof item === 'string' && item.trim() !== ''));
+                finalProxyList.push(...processed.map(normalizeProxyForXray).filter(item => typeof item === 'string' && item.trim() !== ''));
             }
         }
 

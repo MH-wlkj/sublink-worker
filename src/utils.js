@@ -100,6 +100,11 @@ export function tryDecodeSubscriptionLines(input, { decodeUriComponent = false }
 		return trimmed;
 	}
 
+	const isLikelyProxyLine = (segment) => {
+		if (typeof segment !== 'string') return false;
+		return segment.includes('://') || /^[a-zA-Z0-9_.-]+:\d{1,5}/.test(segment.trim());
+	};
+
 	const splitIfMultiple = (value) => {
 		if (typeof value !== 'string') {
 			return value;
@@ -111,7 +116,7 @@ export function tryDecodeSubscriptionLines(input, { decodeUriComponent = false }
 			.map(segment => segment.trim())
 			.filter(segment => segment !== '');
 
-		if (segments.length > 1 && segments.some(segment => segment.includes('://'))) {
+		if (segments.length > 1 && segments.some(isLikelyProxyLine)) {
 			return segments;
 		}
 
@@ -122,7 +127,7 @@ export function tryDecodeSubscriptionLines(input, { decodeUriComponent = false }
 	if (Array.isArray(directResult)) {
 		return directResult;
 	}
-	if (typeof directResult === 'string' && directResult.includes('://')) {
+	if (typeof directResult === 'string' && isLikelyProxyLine(directResult)) {
 		return directResult;
 	}
 
@@ -143,7 +148,7 @@ export function tryDecodeSubscriptionLines(input, { decodeUriComponent = false }
 		if (Array.isArray(decodedResult)) {
 			return decodedResult;
 		}
-		if (typeof decodedResult === 'string' && decodedResult.includes('://')) {
+		if (typeof decodedResult === 'string' && isLikelyProxyLine(decodedResult)) {
 			return decodedResult;
 		}
 	} catch (_) {

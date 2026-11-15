@@ -185,6 +185,26 @@ export function convertSurgeProxyToObject(line) {
                 } : undefined
             };
 
+        case 'socks5':
+        case 'socks5-tls':
+        case 'socks':
+            return {
+                tag,
+                type: 'socks',
+                server,
+                server_port: port,
+                version: '5',
+                username: params.username || undefined,
+                password: params.password || undefined,
+                network: 'tcp',
+                tcp_fast_open: parseBool(params.tfo || params['tcp-fast-open']),
+                tls: type === 'socks5-tls' || parseBool(params.tls) ? {
+                    enabled: true,
+                    server_name: params.sni || server,
+                    insecure: parseBool(params['skip-cert-verify'])
+                } : undefined
+            };
+
         case 'http':
         case 'https':
             // Skip HTTP/HTTPS proxy types

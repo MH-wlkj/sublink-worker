@@ -4,6 +4,7 @@ import { parseVless } from './protocols/vlessParser.js';
 import { parseHysteria2 } from './protocols/hysteria2Parser.js';
 import { parseTrojan } from './protocols/trojanParser.js';
 import { parseTuic } from './protocols/tuicParser.js';
+import { parseSocks, isRawSocksFormat } from './protocols/socksParser.js';
 import { fetchSubscription } from './subscription/httpSubscriptionFetcher.js';
 
 const protocolParsers = {
@@ -16,7 +17,10 @@ const protocolParsers = {
     http: fetchSubscription,
     https: fetchSubscription,
     trojan: parseTrojan,
-    tuic: parseTuic
+    tuic: parseTuic,
+    socks: parseSocks,
+    socks5: parseSocks,
+    tg: parseSocks
 };
 
 export class ProxyParser {
@@ -25,7 +29,10 @@ export class ProxyParser {
             return undefined;
         }
         const trimmed = url.trim();
-        const type = trimmed.split('://')[0];
+        if (isRawSocksFormat(trimmed)) {
+            return parseSocks(trimmed);
+        }
+        const type = trimmed.split('://')[0].toLowerCase();
         const parser = protocolParsers[type];
         if (!parser) {
             return undefined;

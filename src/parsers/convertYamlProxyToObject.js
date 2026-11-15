@@ -258,6 +258,25 @@ export function convertYamlProxyToObject(p) {
                 tls
             };
         }
+        case 'socks':
+        case 'socks5':
+            return {
+                tag: name,
+                type: 'socks',
+                server: p.server,
+                server_port: parseInt(p.port),
+                version: '5',
+                username: p.username || undefined,
+                password: p.password || undefined,
+                network: 'tcp',
+                tcp_fast_open: !!p['fast-open'],
+                udp: typeof p.udp !== 'undefined' ? !!p.udp : undefined,
+                tls: p.tls ? {
+                    enabled: true,
+                    server_name: p.sni || p.servername || p.server,
+                    insecure: !!p['skip-cert-verify']
+                } : undefined
+            };
         default:
             return null;
     }

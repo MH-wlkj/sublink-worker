@@ -115,6 +115,13 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
         // xudp is default in newer versions
         delete sanitized.packet_encoding;
 
+        if (sanitized.type === 'socks5') {
+            sanitized.type = 'socks';
+        }
+        if (sanitized.type === 'socks') {
+            sanitized.version = sanitized.version || '5';
+        }
+
         return sanitized;
     }
 
